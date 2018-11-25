@@ -62,6 +62,8 @@ struct _interpreter {
     PyObject *s_python_empty_tuple;
     PyObject *s_python_function_stem;
     PyObject *s_python_function_xkcd;
+    PyObject *s_python_function_axhline;
+    PyObject *s_python_function_axvline;
 
     /* For now, _interpreter is implemented as a singleton since its currently not possible to have
        multiple independent embedded python interpreters without patching the python source code
@@ -165,6 +167,8 @@ private:
         s_python_function_tight_layout = PyObject_GetAttrString(pymod, "tight_layout");
         s_python_function_stem = PyObject_GetAttrString(pymod, "stem");
         s_python_function_xkcd = PyObject_GetAttrString(pymod, "xkcd");
+        s_python_function_axhline = PyObject_GetAttrString(pymod, "axhline");
+        s_python_function_axvline = PyObject_GetAttrString(pymod, "axvline");
 
         if(    !s_python_function_show
             || !s_python_function_close
@@ -195,6 +199,8 @@ private:
             || !s_python_function_tight_layout
             || !s_python_function_stem
             || !s_python_function_xkcd
+            || !s_python_function_axhline
+            || !s_python_function_axvline
         ) { throw std::runtime_error("Couldn't find required function!"); }
 
         if (   !PyFunction_Check(s_python_function_show)
@@ -225,6 +231,8 @@ private:
             || !PyFunction_Check(s_python_function_errorbar)
             || !PyFunction_Check(s_python_function_stem)
             || !PyFunction_Check(s_python_function_xkcd)
+            || !PyFunction_Check(s_python_function_axhline)
+            || !PyFunction_Check(s_python_function_axvline)
         ) { throw std::runtime_error("Python object is unexpectedly not a PyFunction."); }
 
         s_python_empty_tuple = PyTuple_New(0);
@@ -1113,7 +1121,58 @@ inline void xkcd() {
     Py_DECREF(kwargs);
 
     if (!res)
-        throw std::runtime_error("Call to show() failed.");
+        throw std::runtime_error("Call to xkcd() failed.");
+
+    Py_DECREF(res);
+}
+
+inline void axhline(const double y = 0, const std::string& linestyle = "", const std::string &color = "", const double xmin = 0, const double xmax = 1) {
+    PyObject *res;
+    PyObject *args = PyTuple_New(3);
+    PyObject *kwargs = PyDict_New();
+
+    PyObject *pylinestyle = PyString_FromString(linestyle.c_str());
+    PyObject *pycolor = PyString_FromString(color.c_str());
+
+    PyDict_SetItemString(kwargs, "linestyle", PyString_FromString(linestyle.c_str()));
+    PyDict_SetItemString(kwargs, "color", PyString_FromString(color.c_str()));
+
+    PyTuple_SetItem(args, 0, PyFloat_FromDouble(y));
+    PyTuple_SetItem(args, 1, PyFloat_FromDouble(xmin));
+    PyTuple_SetItem(args, 2, PyFloat_FromDouble(xmax));
+
+    res = PyObject_Call(detail::_interpreter::get().s_python_function_axhline,
+            args, kwargs);
+
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+
+    if (!res)
+        throw std::runtime_error("Call to axhline() failed.");
+
+    Py_DECREF(res);
+}
+
+inline void axvline(const double x = 0, const std::string& linestyle = "", const std::string &color = "", const double ymin = 0, const double ymax = 1) {
+    PyObject *res;
+    PyObject *args = PyTuple_New(3);
+    PyObject *kwargs = PyDict_New();
+
+    PyDict_SetItemString(kwargs, "linestyle", PyString_FromString(linestyle.c_str()));
+    PyDict_SetItemString(kwargs, "color", PyString_FromString(color.c_str()));
+
+    PyTuple_SetItem(args, 0, PyFloat_FromDouble(x));
+    PyTuple_SetItem(args, 1, PyFloat_FromDouble(ymin));
+    PyTuple_SetItem(args, 2, PyFloat_FromDouble(ymax));
+
+    res = PyObject_Call(detail::_interpreter::get().s_python_function_axvline,
+            args, kwargs);
+
+    Py_DECREF(args);
+    Py_DECREF(kwargs);
+
+    if (!res)
+        throw std::runtime_error("Call to axvline() failed.");
 
     Py_DECREF(res);
 }
