@@ -49,6 +49,7 @@ struct _interpreter {
     PyObject *s_python_function_ion;
     PyObject *s_python_function_ylim;
     PyObject *s_python_function_title;
+    PyObject *s_python_function_suptitle;
     PyObject *s_python_function_axis;
     PyObject *s_python_function_xlabel;
     PyObject *s_python_function_ylabel;
@@ -152,6 +153,7 @@ private:
         s_python_function_legend = PyObject_GetAttrString(pymod, "legend");
         s_python_function_ylim = PyObject_GetAttrString(pymod, "ylim");
         s_python_function_title = PyObject_GetAttrString(pymod, "title");
+        s_python_function_suptitle = PyObject_GetAttrString(pymod, "suptitle");
         s_python_function_axis = PyObject_GetAttrString(pymod, "axis");
         s_python_function_xlabel = PyObject_GetAttrString(pymod, "xlabel");
         s_python_function_ylabel = PyObject_GetAttrString(pymod, "ylabel");
@@ -185,6 +187,7 @@ private:
             || !s_python_function_legend
             || !s_python_function_ylim
             || !s_python_function_title
+            || !s_python_function_suptitle
             || !s_python_function_axis
             || !s_python_function_xlabel
             || !s_python_function_ylabel
@@ -219,6 +222,7 @@ private:
             || !PyFunction_Check(s_python_function_annotate)
             || !PyFunction_Check(s_python_function_ylim)
             || !PyFunction_Check(s_python_function_title)
+            || !PyFunction_Check(s_python_function_suptitle)
             || !PyFunction_Check(s_python_function_axis)
             || !PyFunction_Check(s_python_function_xlabel)
             || !PyFunction_Check(s_python_function_ylabel)
@@ -471,23 +475,27 @@ bool named_hist(std::string label,const std::vector<Numeric>& y, long bins=10, s
 }
 
 template<typename NumericX, typename NumericY>
-bool plot(const std::vector<NumericX>& x, const std::vector<NumericY>& y, const std::string& s = "")
+bool plot(const std::vector<NumericX>& x, const std::vector<NumericY>& y, const std::string& format = "", const std::string& color = "")
 {
     assert(x.size() == y.size());
 
     PyObject* xarray = get_array(x);
     PyObject* yarray = get_array(y);
 
-    PyObject* pystring = PyString_FromString(s.c_str());
+    PyObject* pyformat = PyString_FromString(format.c_str());
 
     PyObject* plot_args = PyTuple_New(3);
     PyTuple_SetItem(plot_args, 0, xarray);
     PyTuple_SetItem(plot_args, 1, yarray);
-    PyTuple_SetItem(plot_args, 2, pystring);
+    PyTuple_SetItem(plot_args, 2, pyformat);
 
-    PyObject* res = PyObject_CallObject(detail::_interpreter::get().s_python_function_plot, plot_args);
+    PyObject* kwargs = PyDict_New();
+    PyDict_SetItemString(kwargs, "color", PyString_FromString(color.c_str()));
+
+    PyObject* res = PyObject_Call(detail::_interpreter::get().s_python_function_plot, plot_args, kwargs);
 
     Py_DECREF(plot_args);
+    Py_DECREF(kwargs);
     if(res) Py_DECREF(res);
 
     return res;
@@ -656,10 +664,11 @@ bool errorbar(const std::vector<NumericX> &x, const std::vector<NumericY> &y, co
 }
 
 template<typename Numeric>
-bool named_plot(const std::string& name, const std::vector<Numeric>& y, const std::string& format = "")
+bool named_plot(const std::string& name, const std::vector<Numeric>& y, const std::string& format = "", const std::string& color = "")
 {
     PyObject* kwargs = PyDict_New();
     PyDict_SetItemString(kwargs, "label", PyString_FromString(name.c_str()));
+    PyDict_SetItemString(kwargs, "color", PyString_FromString(color.c_str()));
 
     PyObject* yarray = get_array(y);
 
@@ -680,10 +689,11 @@ bool named_plot(const std::string& name, const std::vector<Numeric>& y, const st
 }
 
 template<typename Numeric>
-bool named_plot(const std::string& name, const std::vector<Numeric>& x, const std::vector<Numeric>& y, const std::string& format = "")
+bool named_plot(const std::string& name, const std::vector<Numeric>& x, const std::vector<Numeric>& y, const std::string& format = "", const std::string& color = "")
 {
     PyObject* kwargs = PyDict_New();
     PyDict_SetItemString(kwargs, "label", PyString_FromString(name.c_str()));
+    PyDict_SetItemString(kwargs, "color", PyString_FromString(color.c_str()));
 
     PyObject* xarray = get_array(x);
     PyObject* yarray = get_array(y);
@@ -1023,6 +1033,19 @@ inline void title(const std::string &titlestr)
     Py_DECREF(res);
 }
 
+inline void suptitle(const std::string &suptitlestr)
+{
+    PyObject* pysuptitlestr = PyString_FromString(suptitlestr.c_str());
+    PyObject* args = PyTuple_New(1);
+    PyTuple_SetItem(args, 0, pysuptitlestr);
+
+    PyObject* res = PyObject_CallObject(detail::_interpreter::get().s_python_function_suptitle, args); 
+    if(!res) throw std::runtime_error("Call to suptitle() failed.");
+    
+    Py_DECREF(args);
+    Py_DECREF(res);
+}
+
 inline void axis(const std::string &axisstr)
 {
     PyObject* str = PyString_FromString(axisstr.c_str());
@@ -1131,9 +1154,6 @@ inline void axhline(const double y = 0, const std::string& linestyle = "", const
     PyObject *args = PyTuple_New(3);
     PyObject *kwargs = PyDict_New();
 
-    PyObject *pylinestyle = PyString_FromString(linestyle.c_str());
-    PyObject *pycolor = PyString_FromString(color.c_str());
-
     PyDict_SetItemString(kwargs, "linestyle", PyString_FromString(linestyle.c_str()));
     PyDict_SetItemString(kwargs, "color", PyString_FromString(color.c_str()));
 
@@ -1225,7 +1245,7 @@ inline void clf() {
     Py_DECREF(res);
 }
 
-    inline void ion() {
+inline void ion() {
     PyObject *res = PyObject_CallObject(
         detail::_interpreter::get().s_python_function_ion,
         detail::_interpreter::get().s_python_empty_tuple);
